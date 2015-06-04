@@ -1,0 +1,107 @@
+user -- ник пользователя
+
+Запускаем виртуальную машину из терминала:
+# VBoxHeadless --startvm Ubuntu &
+
+Подключаемся к виртуальной машине через FreeRDP
+# wfreerdp.exe -p 3389 localhost
+Логинимся на виртуальной машине
+
+Устанавливаем dkms
+# sudo apt-get install dkms
+
+Добавляем в файл строку /etc/apt/sources.list
+>
+deb http://download.virtualbox.org/virtualbox/debian trusty contrib
+>
+
+Скачиваем публичный ключ Oracle и добавляем в базу
+# wget https://www.virtualbox.org/download/oracle_vbox.asc
+# sudo apt-key add oracle_vbox.asc
+
+Обновляем базу пакетов
+# sudo apt-get update
+
+Устанавливаем VirtualBox
+# sudo apt-get install virtualbox-4.3
+
+ИЛИ
+
+Скачиваем deb пакет VirtualBox
+# wget http://download.virtualbox.org/virtualbox/4.3.24/virtualbox-4.3_4.3.24-98716~Ubuntu~raring_amd64.deb
+
+Устанавливаем
+# sudo dpkg -i virtualbox-4.3_4.3.24-98716~Ubuntu~raring_amd64.deb
+# sudo apt-get -f install
+
+>>> Настройка VirtualBox
+Загружаем модуль virtualbox в ядро linux
+# sudo /etc/init.d/vboxdrv setup
+Если появились при загрузке модуля на подобии этой
+>
+Starting VirtualBox kernel modules ...failed!
+>
+то нужно установить пакеты в систему и повторить прошлую команду
+# sudo apt-get install make gcc
+
+Проверяем, что модули загружены в ядро
+# sudo /etc/init.d/vboxdrv status
+>
+VirtualBox kernel modules (vboxdrv, vboxnetflt, vboxnetadp, vboxpci) are loaded.
+>
+
+Добавляем пользователя в группу vboxusers
+# sudo adduser <name> vboxusers
+
+Скачиваем Extension Pack для работы rdp
+# wget http://download.virtualbox.org/virtualbox/4.3.24/Oracle_VM_VirtualBox_Extension_Pack-4.3.24-98716.vbox-extpack
+
+Установим его
+# sudo BoxManage extpack install Oracle_VM_VirtualBox_Extension_Pack-4.3.24-98716.vbox-extpack
+
+Перед установкой guest-машины и после добавления пользователя в группу vboxuser нужно перелогиниться.
+
+>>> Установка guest-машины
+Создаём саму машину (name -- имя машины, ostype -- тип системы, полный список доступен по команде VBoxMange list ostypes)
+# VBoxManage createvm --name ubuntu --ostype Ubuntu --register
+В случае успеха программа зарегистрирует виртуальную машину и выдаст ей UUID.
+
+Далее произведем настройку виртуальной машины
+# VBoxManage modifyvm ubuntu --memory 1024 --floppy disabled --audio none --nic1 nat --natpf1 ",tcp,,3390,,3390" \
+--vram 4 --accelerate3d off --boot1 disk --acpi on --cableconnected1 on --usb off --vrdp on --vrdpport 3390
+
+Параметры:
+memory -- количество оперативной памяти
+floppy -- флоппи диск
+audio -- звук
+nic1 -- сеть, 
+natpf1 -- port forwarding
+vram -- количество видеопамяти
+accelerate3d -- поддержка ускорения 3d
+boot1 -- тип загрузки
+acpi -- управление питанием
+vrde -- использование RDP
+
+Далее созданим hdd диск для виртуальной машины (в случае успеха даст UUID)
+# VBoxManage createhd --filename /home/user/ubuntu.vdi --size 8000
+
+Добавляем контроллер IDE в виртуальную машину
+# VBoxManage storagectl ubuntu --name "IDE Controller" --add ide
+
+Подключаем к IDE контроллеру созданный hdd
+# VBoxManage storageattach ubuntu --storagectl "IDE Controller" --port 0 --device 0 --type hdd \
+--medium /home/user/ubuntu.vdi
+
+Перед тем как подключить установочный образ, его нужно скачать
+- через scp
+# scp <образ>.iso user@localhost:/home/user/
+- через wget
+# wget http://releases.ubuntu.com/14.04.2/ubuntu-14.04.2-server-amd64.iso
+
+Подключаем установочный образ
+# VBoxManage storageattach ubuntu --storagectl "IDE Controller" --port 1 --device 0 --type dvddrive \
+--medium /home/user/ubuntu-14.04.2-server-amd64.iso
+
+Запускаем виртуальную машину
+# nohup VBoxHeadless --startvm ubuntu &
+...
